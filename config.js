@@ -1,9 +1,3 @@
-// Paste your Firebase web app config here (Firebase console → Project settings → Your apps).
-// These values are not secret: Firebase expects them to be public, and firestore.rules is what
-// protects the data.
-export const firebaseConfig = {
-  apiKey: 'PASTE_ME',
-  authDomain: 'PASTE_ME.firebaseapp.com',
-  projectId: 'PASTE_ME',
-  appId: 'PASTE_ME',
-};
+// Where the API (worker.js) runs. The copy of the site on GitHub Pages talks to the Worker;
+// everywhere else (the Worker's own URL, or `wrangler dev`) the API is on the same site.
+export const API = location.hostname.endsWith('github.io') ? 'https://citer.FILLED_IN_BY_SETUP.workers.dev' : '';

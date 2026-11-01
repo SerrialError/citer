@@ -1,44 +1,31 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
-import {
-  getAuth, GithubAuthProvider, signInWithPopup, signOut, onAuthStateChanged, connectAuthEmulator,
-} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
-import {
-  getFirestore, connectFirestoreEmulator, collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
-  onSnapshot, query, orderBy, serverTimestamp, writeBatch,
-} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { firebaseConfig } from './config.js';
+import { API } from './config.js';
 import { referenceParts, toHtml, toText, inText } from './ieee.js';
 import { lookup, blankCitation } from './lookup.js';
 
-// On localhost, talk to the Firebase emulators instead of the real project (see README).
-const local = ['localhost', '127.0.0.1'].includes(location.hostname);
-const app = initializeApp(local ? { apiKey: 'demo', authDomain: 'localhost', projectId: 'demo-citer' } : firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-if (local) {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  connectFirestoreEmulator(db, '127.0.0.1', 8085);
-}
-
 const $ = (sel) => document.querySelector(sel);
 const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const displayName = (u) => u.displayName || u.email || 'GitHub user';
 
 let user = null;
-let stop = () => {}; // unsubscribes the current page's live listeners
+let stop = () => {}; // stops the current page's polling
+let refresh = () => {}; // reloads the current page's data now
 let projectId = null;
 let citations = [];
 let selected = new Set();
 let editing = null; // id of the citation in the editor, or null for a new one
 
-onAuthStateChanged(auth, (u) => {
-  user = u;
-  $('#account').innerHTML = u
-    ? `${u.photoURL ? `<img src="${esc(u.photoURL)}" alt="">` : ''}<span>${esc(displayName(u))}</span>
-       <button class="ghost" data-action="sign-out">Sign out</button>`
-    : `<button data-action="sign-in">Sign in with GitHub</button>`;
-  route();
-});
+// After GitHub sign-in the Worker sends us back with ?token=…; keep it and tidy the URL.
+const params = new URLSearchParams(location.search);
+if (params.has('token')) {
+  localStorage.token = params.get('token');
+  history.replaceState(null, '', location.pathname + location.hash);
+}
+
+user = await api('/api/me').catch(() => null);
+$('#account').innerHTML = user
+  ? `${user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : ''}<span>${esc(user.name)}</span>
+     <button class="ghost" data-action="sign-out">Sign out</button>`
+  : `<button data-action="sign-in">Sign in with GitHub</button>`;
+route();
 window.addEventListener('hashchange', route);
 
 function route() {
@@ -69,19 +56,20 @@ function showHome() {
 
   $('#new-project')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = e.target.name.value.trim();
-    const ref = await addDoc(collection(db, 'projects'), {
-      name, owner: user.uid, ownerName: displayName(user), created: serverTimestamp(),
-    });
-    location.hash = `#/p/${ref.id}`;
+    try {
+      const project = await api('/api/projects', 'POST', { name: e.target.name.value });
+      location.hash = `#/p/${project.id}`;
+    } catch (err) {
+      showError(err);
+    }
   });
 
-  stop = onSnapshot(query(collection(db, 'projects'), orderBy('created', 'desc')), (snap) => {
-    $('#projects').innerHTML = snap.docs
-      .map((d) => `<a class="card" href="#/p/${d.id}"><strong>${esc(d.data().name)}</strong>
-                   <span class="muted">by ${esc(d.data().ownerName)}</span></a>`)
+  stop = watch('/api/projects', (projects) => {
+    $('#projects').innerHTML = projects
+      .map((p) => `<a class="card" href="#/p/${esc(p.id)}"><strong>${esc(p.name)}</strong>
+                   <span class="muted">by ${esc(p.owner_name)}</span></a>`)
       .join('') || '<p class="muted">No projects yet.</p>';
-  }, showError);
+  });
 }
 
 // ---- Project: its references ----
@@ -123,27 +111,24 @@ function showProject(id) {
     button.textContent = 'Cite';
   });
 
-  const unsubProject = onSnapshot(doc(db, 'projects', id), (snap) => {
-    if (!snap.exists()) {
-      $('#main').innerHTML = '<a href="#/" class="back">← All projects</a><h1>Project not found</h1>';
-      return;
-    }
-    $('#project-name').textContent = snap.data().name;
-    document.title = `${snap.data().name} · Citer`;
-    $('#project-actions').innerHTML = user?.uid === snap.data().owner
+  const stopWatching = watch(`/api/projects/${encodeURIComponent(id)}`, ({ project, citations: list }) => {
+    $('#project-name').textContent = project.name;
+    document.title = `${project.name} · Citer`;
+    $('#project-actions').innerHTML = user?.id === project.owner
       ? '<button class="ghost danger" data-action="delete-project">Delete project</button>'
       : '';
-  }, showError);
-
-  const unsubCitations = onSnapshot(query(collection(db, 'projects', id, 'citations'), orderBy('order')), (snap) => {
-    citations = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    citations = list;
     selected = new Set([...selected].filter((sid) => citations.some((c) => c.id === sid)));
     renderRefs();
-  }, showError);
+  }, (err) => {
+    if (err.status === 404) {
+      stopWatching();
+      $('#main').innerHTML = '<a href="#/" class="back">← All projects</a><h1>Project not found</h1>';
+    }
+  });
 
   stop = () => {
-    unsubProject();
-    unsubCitations();
+    stopWatching();
     document.title = 'Citer';
   };
 }
@@ -198,14 +183,15 @@ document.addEventListener('click', async (e) => {
   const action = e.target.closest('[data-action]')?.dataset.action;
   if (!action) return;
   const picked = citations.filter((c) => selected.has(c.id));
-  const citationsRef = () => collection(db, 'projects', projectId, 'citations');
 
   try {
     switch (action) {
       case 'sign-in':
-        return await signInWithPopup(auth, new GithubAuthProvider());
+        return (location.href = `${API}/api/login?return=${encodeURIComponent(location.href)}`);
       case 'sign-out':
-        return await signOut(auth);
+        await api('/api/logout', 'POST');
+        localStorage.removeItem('token');
+        return location.reload();
       case 'manual':
         return openEditor(blankCitation());
       case 'copy-all': {
@@ -229,22 +215,20 @@ document.addEventListener('click', async (e) => {
         const i = citations.indexOf(picked[0]);
         const other = citations[action === 'up' ? i - 1 : i + 1];
         if (!other) return;
-        const batch = writeBatch(db);
-        batch.update(doc(citationsRef(), picked[0].id), { order: other.order });
-        batch.update(doc(citationsRef(), other.id), { order: picked[0].order });
-        return await batch.commit();
+        await Promise.all([
+          api(`/api/citations/${picked[0].id}`, 'PUT', { position: other.position }),
+          api(`/api/citations/${other.id}`, 'PUT', { position: picked[0].position }),
+        ]);
+        return refresh();
       }
       case 'delete':
         if (!confirm(`Delete ${picked.length === 1 ? 'this reference' : `${picked.length} references`}?`)) return;
-        return await Promise.all(picked.map((c) => deleteDoc(doc(citationsRef(), c.id))));
-      case 'delete-project': {
+        await Promise.all(picked.map((c) => api(`/api/citations/${c.id}`, 'DELETE')));
+        return refresh();
+      case 'delete-project':
         if (!confirm('Delete this project and all its references?')) return;
-        const batch = writeBatch(db);
-        (await getDocs(citationsRef())).forEach((d) => batch.delete(d.ref));
-        batch.delete(doc(db, 'projects', projectId));
-        await batch.commit();
+        await api(`/api/projects/${projectId}`, 'DELETE');
         return (location.hash = '#/');
-      }
     }
   } catch (err) {
     showError(err);
@@ -293,14 +277,55 @@ editor.addEventListener('close', async () => {
   if (editor.returnValue !== 'save') return;
   editor.returnValue = '';
   const c = readForm();
-  const citationsRef = collection(db, 'projects', projectId, 'citations');
   try {
-    if (editing) await updateDoc(doc(citationsRef, editing), c);
-    else await addDoc(citationsRef, { ...c, order: Date.now(), addedBy: user.uid });
+    if (editing) await api(`/api/citations/${editing}`, 'PUT', c);
+    else await api(`/api/projects/${projectId}/citations`, 'POST', c);
+    refresh();
   } catch (err) {
     showError(err);
   }
 });
+
+// ---- Talking to the Worker ----
+
+async function api(path, method = 'GET', body) {
+  const res = await fetch(API + path, {
+    method,
+    headers: { Authorization: `Bearer ${localStorage.token || ''}`, 'Content-Type': 'application/json' },
+    body: body && JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status });
+  return data;
+}
+
+// Loads `path` now and every few seconds after, so everyone sees each other's changes.
+// `render` only runs when the data has changed.
+function watch(path, render, onError = () => {}) {
+  let last;
+  let timer;
+  let stopped = false;
+  refresh = async () => {
+    clearTimeout(timer);
+    try {
+      const data = await api(path);
+      const text = JSON.stringify(data);
+      if (!stopped && text !== last) {
+        last = text;
+        render(data);
+      }
+    } catch (err) {
+      console.error(err);
+      if (!stopped) onError(err);
+    }
+    if (!stopped) timer = setTimeout(refresh, document.hidden ? 15000 : 3000);
+  };
+  refresh();
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
+}
 
 // ---- Small helpers ----
 
@@ -327,5 +352,5 @@ function toast(message) {
 
 function showError(err) {
   console.error(err);
-  toast(err.code === 'permission-denied' ? "You don't have permission to do that." : err.message);
+  toast(err.message);
 }

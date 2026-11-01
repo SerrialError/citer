@@ -1,0 +1,7 @@
+.*
+worker.js
+wrangler.toml
+schema.sql
+*.md
+*.test.js
+node_modules

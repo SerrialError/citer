@@ -1,0 +1,18 @@
+name = "citer"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+# The Worker also serves the site, so the whole app runs from one place locally (`wrangler dev`)
+# and at the workers.dev URL. .assetsignore keeps everything that isn't the site out of it.
+[assets]
+directory = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "citer"
+database_id = "FILLED_IN_BY_SETUP"
+
+[vars]
+GITHUB_CLIENT_ID = "FILLED_IN_BY_SETUP"
+# Other sites allowed to sign in and call the API (the Worker's own URL always is).
+ALLOWED_ORIGINS = "https://serrialerror.github.io"
