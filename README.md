@@ -1,6 +1,6 @@
 # Citer
 
-A small shared IEEE citation maker. Paste a URL, DOI, or ISBN and it fills in the reference, which
+A small shared citation maker. Paste a URL, DOI, or ISBN and it fills in the reference, which
 you can check and fix before saving. Projects are public, anyone can read them, and anyone signed in
 with GitHub can add to them. Open projects refresh every few seconds, so everyone sees each other's
 changes.
