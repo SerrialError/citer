@@ -1,5 +1,5 @@
 import { API } from './config.js';
-import { referenceParts, toHtml, toText, inText } from './ieee.js';
+import { styles, styleFor, toHtml, toText } from './styles.js';
 import { lookup, blankCitation } from './lookup.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -10,6 +10,7 @@ let stop = () => {}; // stops the current page's polling
 let refresh = () => {}; // reloads the current page's data now
 let projectId = null;
 let citations = [];
+let style = styleFor(); // the open project's citation style
 let selected = new Set();
 let editing = null; // id of the citation in the editor, or null for a new one
 
@@ -42,8 +43,8 @@ function showHome() {
   projectId = null;
   $('#main').innerHTML = `
     <section class="hero">
-      <h1>IEEE citations, together.</h1>
-      <p>Paste a link, DOI, or ISBN and get an IEEE reference. Everyone in a project sees changes live.</p>
+      <h1>Citations, together.</h1>
+      <p>Paste a link, DOI, or ISBN and get a formatted reference. Everyone in a project sees changes live.</p>
     </section>
     ${user
       ? `<form id="new-project" class="add">
@@ -89,7 +90,14 @@ function showProject(id) {
       : `<p class="muted">Sign in with GitHub to add references.</p>`}
     <div class="refs-head">
       <h2>References</h2>
-      <button class="ghost" data-action="copy-all">Copy all</button>
+      <div class="tools">
+        <label>Style
+          <select id="style" ${user ? '' : 'disabled title="Sign in to change the style"'}>
+            ${Object.entries(styles).map(([sid, s]) => `<option value="${sid}">${esc(s.name)}</option>`).join('')}
+          </select>
+        </label>
+        <button class="ghost" data-action="copy-all">Copy all</button>
+      </div>
     </div>
     <p class="muted small">Click a reference to select it. Select several to cite them together.</p>
     <ol id="refs" class="refs"></ol>`;
@@ -111,12 +119,23 @@ function showProject(id) {
     button.textContent = 'Cite';
   });
 
+  $('#style').addEventListener('change', async (e) => {
+    try {
+      await api(`/api/projects/${encodeURIComponent(id)}`, 'PUT', { style: e.target.value });
+      refresh();
+    } catch (err) {
+      showError(err);
+    }
+  });
+
   const stopWatching = watch(`/api/projects/${encodeURIComponent(id)}`, ({ project, citations: list }) => {
     $('#project-name').textContent = project.name;
     document.title = `${project.name} · Citer`;
     $('#project-actions').innerHTML = user?.id === project.owner
       ? '<button class="ghost danger" data-action="delete-project">Delete project</button>'
       : '';
+    style = styleFor(project.style);
+    $('#style').value = styles[project.style] ? project.style : 'ieee';
     citations = list;
     selected = new Set([...selected].filter((sid) => citations.some((c) => c.id === sid)));
     renderRefs();
@@ -138,7 +157,7 @@ function renderRefs() {
   if (!refs) return;
   refs.innerHTML = citations
     .map((c, i) => `<li class="ref${selected.has(c.id) ? ' selected' : ''}" data-id="${c.id}">
-                      <span class="num">[${i + 1}]</span><span>${toHtml(referenceParts(c))}</span></li>`)
+                      <span class="num">[${i + 1}]</span><span>${toHtml(style.referenceParts(c))}</span></li>`)
     .join('') || '<li class="empty">No references yet. Paste a link above.</li>';
   renderSelection();
 }
@@ -161,13 +180,13 @@ function renderSelection() {
     <button class="ghost icon" data-action="clear" aria-label="Clear selection" title="Clear selection">✕</button>`;
 }
 
-const numbers = (picked) => inText(picked.map((c) => citations.indexOf(c) + 1));
+const numbers = (picked) => style.inText(picked.map((c) => citations.indexOf(c) + 1));
 
 function bibliography(picked) {
   const n = (c) => `[${citations.indexOf(c) + 1}]`;
   return {
-    html: picked.map((c) => `<p>${n(c)} ${toHtml(referenceParts(c))}</p>`).join(''),
-    text: picked.map((c) => `${n(c)} ${toText(referenceParts(c))}`).join('\n'),
+    html: picked.map((c) => `<p>${n(c)} ${toHtml(style.referenceParts(c))}</p>`).join(''),
+    text: picked.map((c) => `${n(c)} ${toText(style.referenceParts(c))}`).join('\n'),
   };
 }
 
@@ -269,7 +288,7 @@ function updateForm() {
   form.querySelectorAll('[data-for]').forEach((label) => {
     label.hidden = !label.dataset.for.split(' ').includes(type);
   });
-  $('#preview').innerHTML = toHtml(referenceParts(readForm()));
+  $('#preview').innerHTML = toHtml(style.referenceParts(readForm()));
 }
 form.addEventListener('input', updateForm);
 

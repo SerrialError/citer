@@ -54,7 +54,7 @@ async function route(req, env, url) {
     if (method === 'POST') {
       const { name } = await req.json();
       if (!name?.trim() || name.length > 200) throw httpError(400, 'Give the project a name.');
-      const project = { id: newId(), name: name.trim(), owner: signedIn().id, owner_name: user.name, created: Date.now() };
+      const project = { id: newId(), name: name.trim(), owner: signedIn().id, owner_name: user.name, created: Date.now(), style: 'ieee' };
       await db.prepare('INSERT INTO projects (id, name, owner, owner_name, created) VALUES (?, ?, ?, ?, ?)')
         .bind(project.id, project.name, project.owner, project.owner_name, project.created).run();
       return json(project);
@@ -68,6 +68,13 @@ async function route(req, env, url) {
       const { results } = await db.prepare('SELECT * FROM citations WHERE project = ? ORDER BY position').bind(id).all();
       const citations = results.map((c) => ({ ...JSON.parse(c.data), id: c.id, position: c.position }));
       return json({ project, citations });
+    }
+    if (method === 'PUT') {
+      signedIn();
+      const { style } = await req.json();
+      if (!/^[a-z0-9-]{1,30}$/.test(style || '')) throw httpError(400, 'Unknown citation style.');
+      await db.prepare('UPDATE projects SET style = ? WHERE id = ?').bind(style, id).run();
+      return json({});
     }
     if (method === 'DELETE') {
       if (project.owner !== signedIn().id) throw httpError(403, 'Only the owner can delete a project.');

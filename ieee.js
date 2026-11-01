@@ -85,11 +85,6 @@ export function referenceParts(c) {
   return parts;
 }
 
-const escape = (s) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
-
-export const toHtml = (parts) => parts.map(([t, i]) => (i ? `<i>${escape(t)}</i>` : escape(t))).join('');
-export const toText = (parts) => parts.map(([t]) => t).join('');
-
 // [1, 2, 3, 5] -> "[1]–[3], [5]"
 export function inText(numbers) {
   const sorted = [...new Set(numbers)].sort((a, b) => a - b);

@@ -5,6 +5,8 @@ you can check and fix before saving. Projects are public, anyone can read them, 
 with GitHub can add to them. Open projects refresh every few seconds, so everyone sees each other's
 changes.
 
+Each project has a citation style that anyone signed in can change. IEEE is the only one so far.
+
 Click a reference to select it, then copy its in-text citation (`[2]`) or the full reference.
 Select several to cite them together (`[1]–[3], [5]`). "Copy all" copies the whole reference list
 with italics intact, ready to paste into Word or Google Docs.
@@ -16,7 +18,8 @@ Plain HTML, CSS, and JavaScript, with no build step and no npm packages.
 | File | What it does |
 | --- | --- |
 | `index.html`, `style.css`, `app.js` | The page and its UI |
-| `ieee.js` | IEEE formatting: references, author names, dates, in-text citations |
+| `styles.js` | The list of citation styles a project can use |
+| `ieee.js` | The IEEE style: references, author names, dates, in-text citations |
 | `lookup.js` | Looks up a URL/DOI/ISBN with [Wikipedia's citation service](https://www.mediawiki.org/wiki/Citoid) (free, no key) |
 | `worker.js` | The API: GitHub sign-in, projects, citations |
 | `schema.sql` | The database tables |
@@ -59,3 +62,8 @@ First-time setup, already done for the live site:
    callback URL `https://citer.<subdomain>.workers.dev/api/callback`. Put its Client ID in
    `wrangler.toml` and its secret in the Worker with `npx wrangler secret put GITHUB_CLIENT_SECRET`.
 3. Put the Worker's URL in `config.js`.
+
+## Adding a citation style
+
+Write a module like `ieee.js` that exports `referenceParts(citation)` and `inText(numbers)`, then
+add it to the list in `styles.js`. It shows up in every project's Style menu.

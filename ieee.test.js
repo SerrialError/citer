@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatAuthors, formatDate, inText, referenceParts, toHtml, toText } from './ieee.js';
+import { formatAuthors, formatDate, inText, referenceParts } from './ieee.js';
+import { toHtml, toText } from './styles.js';
 
 const text = (c) => toText(referenceParts(c));
 

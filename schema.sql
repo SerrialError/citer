@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS projects (
   name TEXT NOT NULL,
   owner TEXT NOT NULL,
   owner_name TEXT NOT NULL,
-  created INTEGER NOT NULL
+  created INTEGER NOT NULL,
+  style TEXT NOT NULL DEFAULT 'ieee' -- an id from styles.js
 );
 
 CREATE TABLE IF NOT EXISTS citations (
