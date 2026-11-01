@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Citer</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><text x='16' y='22' font-size='15' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'>[1]</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="bar">
+      <a href="#/" class="logo"><span class="badge">[1]</span> Citer</a>
+      <div id="account"></div>
+    </header>
+
+    <main id="main"></main>
+
+    <div id="selection" class="selection" hidden></div>
+
+    <dialog id="editor">
+      <form method="dialog">
+        <h2 id="editor-title">Edit reference</h2>
+        <div class="fields">
+          <label class="wide">Type
+            <select name="type">
+              <option value="website">Website</option>
+              <option value="article">Journal or conference article</option>
+              <option value="book">Book</option>
+            </select>
+          </label>
+          <label class="wide">Authors <small>one per line: "Last, First", or just an organization name</small>
+            <textarea name="authors" rows="3"></textarea>
+          </label>
+          <label class="wide">Title <input name="title"></label>
+          <label class="wide" data-for="article website">Journal / website name <input name="container"></label>
+          <label data-for="book">Publisher <input name="publisher"></label>
+          <label data-for="book">City, Country <input name="place"></label>
+          <label data-for="book">Edition <input name="edition" placeholder="2nd"></label>
+          <label data-for="article">Volume <input name="volume"></label>
+          <label data-for="article">Issue <input name="issue"></label>
+          <label data-for="article">Pages <input name="pages" placeholder="12–19"></label>
+          <label>Published <input name="date" placeholder="YYYY-MM-DD"></label>
+          <label data-for="website">Accessed <input name="accessed" type="date"></label>
+          <label class="wide" data-for="website">URL <input name="url" type="url"></label>
+          <label class="wide" data-for="article">DOI <input name="doi"></label>
+        </div>
+        <p class="preview" id="preview"></p>
+        <div class="buttons">
+          <button value="cancel" class="ghost" formnovalidate>Cancel</button>
+          <button value="save">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast"></div>
+  </body>
+</html>
