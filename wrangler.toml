@@ -10,7 +10,7 @@ directory = "."
 [[d1_databases]]
 binding = "DB"
 database_name = "citer"
-database_id = "FILLED_IN_BY_SETUP"
+database_id = "42851e3f-469f-40c8-8af1-888b123baaea"
 
 [vars]
 GITHUB_CLIENT_ID = "FILLED_IN_BY_SETUP"
