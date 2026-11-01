@@ -185,8 +185,8 @@ const numbers = (picked) => style.inText(picked.map((c) => citations.indexOf(c) 
 function bibliography(picked) {
   const n = (c) => `[${citations.indexOf(c) + 1}]`;
   return {
-    html: picked.map((c) => `<p>${n(c)} ${toHtml(style.referenceParts(c))}</p>`).join(''),
-    text: picked.map((c) => `${n(c)} ${toText(style.referenceParts(c))}`).join('\n'),
+    html: picked.map((c) => `<p>${n(c)}<span style="white-space:pre">\t</span>${toHtml(style.referenceParts(c))}</p>`).join(''),
+    text: picked.map((c) => `${n(c)}\t${toText(style.referenceParts(c))}`).join('\n'),
   };
 }
 
